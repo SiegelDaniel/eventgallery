@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Gallery · Event Gallery{% endblock %}
+{% block content %}
+<section>
+  <div class="gallery-head">
+    <h1>Gallery <span class="muted">({{ images|length }})</span></h1>
+    {% if images %}
+    <div class="bulk">
+      <button type="button" class="btn" id="selectAll">Select all</button>
+      <button type="submit" form="galleryForm" formaction="{{ url_for('download') }}" class="btn primary">Download zip</button>
+      <button type="submit" form="galleryForm" formaction="{{ url_for('delete') }}" class="btn danger"
+              onclick="return confirm('Delete the selected photos? This cannot be undone.');">Delete</button>
+    </div>
+    {% endif %}
+  </div>
+
+  {% if not images %}
+    <p class="muted">No photos yet. <a href="{{ url_for('index') }}">Upload some</a>.</p>
+  {% else %}
+    <form id="galleryForm" method="post">
+      <div class="grid">
+        {% for name in images %}
+        <label class="tile">
+          <input type="checkbox" name="selected" value="{{ name }}">
+          <a class="view" href="{{ url_for('image', name=name) }}" target="_blank" rel="noopener">
+            <img loading="lazy" src="{{ url_for('thumb', name=name) }}" alt="{{ name }}">
+          </a>
+          <span class="check"></span>
+        </label>
+        {% endfor %}
+      </div>
+    </form>
+  {% endif %}
+</section>
+
+<script>
+  const selectAll = document.getElementById('selectAll');
+  if (selectAll) {
+    selectAll.addEventListener('click', () => {
+      const boxes = document.querySelectorAll('input[name="selected"]');
+      const anyUnchecked = Array.from(boxes).some(b => !b.checked);
+      boxes.forEach(b => (b.checked = anyUnchecked));
+      selectAll.textContent = anyUnchecked ? 'Deselect all' : 'Select all';
+    });
+  }
+</script>
+{% endblock %}

@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Upload · Event Gallery{% endblock %}
+{% block content %}
+<section class="card">
+  <h1>Add your photos</h1>
+  <p class="muted">Pick pictures from your phone and upload them to the shared gallery.</p>
+
+  <form action="{{ url_for('upload') }}" method="post" enctype="multipart/form-data" id="uploadForm">
+    <label class="picker" for="photos">
+      <span id="pickerText">Tap to select photos</span>
+      <input id="photos" type="file" name="photos" accept="image/*" multiple capture="environment" hidden>
+    </label>
+
+    <div id="preview" class="preview"></div>
+
+    <button type="submit" class="btn primary" id="submitBtn" disabled>Upload</button>
+  </form>
+</section>
+
+<script>
+  const input = document.getElementById('photos');
+  const preview = document.getElementById('preview');
+  const pickerText = document.getElementById('pickerText');
+  const submitBtn = document.getElementById('submitBtn');
+
+  input.addEventListener('change', () => {
+    preview.innerHTML = '';
+    const files = Array.from(input.files || []);
+    pickerText.textContent = files.length
+      ? `${files.length} photo${files.length > 1 ? 's' : ''} selected — tap to change`
+      : 'Tap to select photos';
+    submitBtn.disabled = files.length === 0;
+    files.forEach(file => {
+      const img = document.createElement('img');
+      img.src = URL.createObjectURL(file);
+      img.onload = () => URL.revokeObjectURL(img.src);
+      preview.appendChild(img);
+    });
+  });
+
+  document.getElementById('uploadForm').addEventListener('submit', () => {
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Uploading…';
+  });
+</script>
+{% endblock %}
