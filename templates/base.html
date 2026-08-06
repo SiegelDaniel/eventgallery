@@ -12,6 +12,7 @@
     <nav>
       <a href="{{ url_for('index') }}">Upload</a>
       <a href="{{ url_for('gallery') }}">Gallery</a>
+      {% if session.get('authed') %}<a href="{{ url_for('logout') }}">Log out</a>{% endif %}
     </nav>
   </header>
   <main>

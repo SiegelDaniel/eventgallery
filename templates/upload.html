@@ -3,32 +3,36 @@
 {% block content %}
 <section class="card">
   <h1>Add your photos</h1>
-  <p class="muted">Pick pictures from your phone and upload them to the shared gallery.</p>
+  <p class="muted">Pick pictures from your library or take a new one.</p>
 
   <form action="{{ url_for('upload') }}" method="post" enctype="multipart/form-data" id="uploadForm">
     <label class="picker" for="photos">
-      <span id="pickerText">Tap to select photos</span>
-      <input id="photos" type="file" name="photos" accept="image/*" multiple capture="environment" hidden>
+      <span id="pickerText">Tap to add photos</span>
+      <input id="photos" type="file" name="photos" accept="image/*" multiple hidden>
     </label>
 
     <div id="preview" class="preview"></div>
 
     <button type="submit" class="btn primary" id="submitBtn" disabled>Upload</button>
+    <p id="status" class="status" role="status"></p>
   </form>
 </section>
 
 <script>
+  const form = document.getElementById('uploadForm');
   const input = document.getElementById('photos');
   const preview = document.getElementById('preview');
   const pickerText = document.getElementById('pickerText');
   const submitBtn = document.getElementById('submitBtn');
+  const status = document.getElementById('status');
 
   input.addEventListener('change', () => {
     preview.innerHTML = '';
+    status.textContent = '';
     const files = Array.from(input.files || []);
     pickerText.textContent = files.length
       ? `${files.length} photo${files.length > 1 ? 's' : ''} selected — tap to change`
-      : 'Tap to select photos';
+      : 'Tap to add photos';
     submitBtn.disabled = files.length === 0;
     files.forEach(file => {
       const img = document.createElement('img');
@@ -38,9 +42,32 @@
     });
   });
 
-  document.getElementById('uploadForm').addEventListener('submit', () => {
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
     submitBtn.disabled = true;
     submitBtn.textContent = 'Uploading…';
+    status.textContent = '';
+    try {
+      const res = await fetch(form.action, {
+        method: 'POST',
+        body: new FormData(form),
+        headers: { 'X-Requested-With': 'fetch' },
+      });
+      if (!res.ok) throw new Error('upload failed');
+      const data = await res.json();
+      // Stay on this page — just confirm and reset for the next batch.
+      form.reset();
+      preview.innerHTML = '';
+      pickerText.textContent = 'Tap to add photos';
+      status.className = 'status ok';
+      status.textContent = `✓ Uploaded ${data.saved} photo${data.saved === 1 ? '' : 's'}. Add more?`;
+    } catch (err) {
+      status.className = 'status err';
+      status.textContent = 'Upload failed. Please try again.';
+    } finally {
+      submitBtn.textContent = 'Upload';
+      submitBtn.disabled = true;
+    }
   });
 </script>
 {% endblock %}

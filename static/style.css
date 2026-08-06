@@ -132,4 +132,72 @@ h1 { font-size: 1.4rem; margin: 0 0 6px; }
   top: 50%; left: 50%;
   transform: translate(-50%, -50%);
 }
-.tile input:checked ~ .view img { outline: 3px solid var(--accent); outline-offset: -3px; }
+
+/* Gallery tile: image is the click-to-view target, checkbox is a corner control */
+figure.tile { margin: 0; }
+.tile .thumb { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; cursor: zoom-in; }
+.tile .pick {
+  position: absolute;
+  top: 6px; left: 6px;
+  cursor: pointer;
+}
+.tile .pick input { position: absolute; opacity: 0; pointer-events: none; }
+.tile .pick .check {
+  display: block;
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  background: rgba(0,0,0,.4);
+}
+.tile .pick input:checked ~ .check { background: var(--accent); border-color: var(--accent); }
+.tile .pick input:checked ~ .check::after {
+  content: "✓";
+  color: #fff;
+  font-size: 15px;
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+}
+.tile:has(.pick input:checked) .thumb { outline: 3px solid var(--accent); outline-offset: -3px; }
+
+/* Upload status + login input */
+.status { margin: 10px 0 0; min-height: 1.2em; }
+.status.ok { color: #57d38c; }
+.status.err { color: var(--danger); }
+.card-narrow { max-width: 420px; margin: 40px auto 0; }
+.input {
+  width: 100%;
+  padding: 12px 14px;
+  margin: 8px 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #0f131b;
+  color: var(--text);
+  font-size: 1rem;
+}
+.input:focus { outline: none; border-color: var(--accent); }
+
+/* Full-screen photo viewer */
+.lightbox {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.92);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  cursor: zoom-out;
+}
+.lightbox img { max-width: 96vw; max-height: 92vh; object-fit: contain; border-radius: 6px; }
+.lb-close {
+  position: absolute;
+  top: 14px; right: 16px;
+  width: 42px; height: 42px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255,255,255,.15);
+  color: #fff;
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+.lb-close:hover { background: rgba(255,255,255,.28); }

@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Gallery login · Event Gallery{% endblock %}
+{% block content %}
+<section class="card card-narrow">
+  <h1>Gallery is protected</h1>
+  <p class="muted">Enter the password to view the photos.</p>
+
+  <form method="post" action="{{ url_for('login', next=request.args.get('next', '')) }}">
+    <input class="input" type="password" name="password" placeholder="Password"
+           autocomplete="current-password" autofocus required>
+    {% if error %}<p class="status err">{{ error }}</p>{% endif %}
+    <button type="submit" class="btn primary">Enter</button>
+  </form>
+</section>
+{% endblock %}

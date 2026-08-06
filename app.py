@@ -1,17 +1,19 @@
 import io
 import os
-import re
 import time
 import zipfile
+from functools import wraps
 
 from flask import (
     Flask,
     abort,
+    jsonify,
     redirect,
     render_template,
     request,
     send_file,
     send_from_directory,
+    session,
     url_for,
 )
 from werkzeug.utils import secure_filename
@@ -21,12 +23,25 @@ UPLOAD_DIR = os.environ.get("UPLOAD_DIR", os.path.join(BASE_DIR, "uploads"))
 THUMB_DIR = os.path.join(UPLOAD_DIR, ".thumbs")
 ALLOWED_EXT = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".heic", ".heif"}
 MAX_CONTENT_MB = int(os.environ.get("MAX_CONTENT_MB", "50"))
+GALLERY_PASSWORD = os.environ.get("GALLERY_PASSWORD", "romanraucht")
 
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 os.makedirs(THUMB_DIR, exist_ok=True)
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = MAX_CONTENT_MB * 1024 * 1024
+# Set SECRET_KEY in the environment so gallery logins survive restarts.
+app.secret_key = os.environ.get("SECRET_KEY", os.urandom(24))
+
+
+def login_required(view):
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        if not session.get("authed"):
+            return redirect(url_for("login", next=request.full_path))
+        return view(*args, **kwargs)
+
+    return wrapped
 
 # Honor an optional URL prefix (e.g. /eventgallery) set by the reverse proxy,
 # so url_for() generates correct links when mounted under a sub-path.
@@ -97,15 +112,38 @@ def upload():
             continue
         f.save(os.path.join(UPLOAD_DIR, _safe_name(f.filename)))
         saved += 1
-    return redirect(url_for("gallery"))
+    # Uploads happen via fetch(); stay on the upload page instead of redirecting.
+    if request.headers.get("X-Requested-With") == "fetch":
+        return jsonify({"saved": saved})
+    return redirect(url_for("index"))
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    error = None
+    if request.method == "POST":
+        if request.form.get("password") == GALLERY_PASSWORD:
+            session["authed"] = True
+            target = request.args.get("next") or url_for("gallery")
+            return redirect(target)
+        error = "Wrong password."
+    return render_template("login.html", error=error)
+
+
+@app.route("/logout")
+def logout():
+    session.pop("authed", None)
+    return redirect(url_for("index"))
 
 
 @app.route("/gallery")
+@login_required
 def gallery():
     return render_template("gallery.html", images=_list_images())
 
 
 @app.route("/image/<path:name>")
+@login_required
 def image(name):
     name = secure_filename(name)
     if not _allowed(name):
@@ -114,6 +152,7 @@ def image(name):
 
 
 @app.route("/thumb/<path:name>")
+@login_required
 def thumb(name):
     name = secure_filename(name)
     if not _allowed(name):
@@ -137,6 +176,7 @@ def thumb(name):
 
 
 @app.route("/download", methods=["POST"])
+@login_required
 def download():
     names = _valid_selection(request.form.getlist("selected"))
     if not names:
@@ -155,6 +195,7 @@ def download():
 
 
 @app.route("/delete", methods=["POST"])
+@login_required
 def delete():
     names = _valid_selection(request.form.getlist("selected"))
     for name in names:

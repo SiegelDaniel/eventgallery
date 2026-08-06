@@ -20,20 +20,30 @@
     <form id="galleryForm" method="post">
       <div class="grid">
         {% for name in images %}
-        <label class="tile">
-          <input type="checkbox" name="selected" value="{{ name }}">
-          <a class="view" href="{{ url_for('image', name=name) }}" target="_blank" rel="noopener">
-            <img loading="lazy" src="{{ url_for('thumb', name=name) }}" alt="{{ name }}">
-          </a>
-          <span class="check"></span>
-        </label>
+        <figure class="tile">
+          <img class="thumb" loading="lazy"
+               src="{{ url_for('thumb', name=name) }}"
+               data-full="{{ url_for('image', name=name) }}"
+               alt="{{ name }}">
+          <label class="pick" title="Select">
+            <input type="checkbox" name="selected" value="{{ name }}">
+            <span class="check"></span>
+          </label>
+        </figure>
         {% endfor %}
       </div>
     </form>
   {% endif %}
 </section>
 
+<!-- Full-screen viewer -->
+<div id="lightbox" class="lightbox" hidden>
+  <button type="button" class="lb-close" aria-label="Close">✕</button>
+  <img id="lightboxImg" src="" alt="">
+</div>
+
 <script>
+  // Selection toggle
   const selectAll = document.getElementById('selectAll');
   if (selectAll) {
     selectAll.addEventListener('click', () => {
@@ -43,5 +53,23 @@
       selectAll.textContent = anyUnchecked ? 'Deselect all' : 'Select all';
     });
   }
+
+  // Click a photo to view it full size
+  const lightbox = document.getElementById('lightbox');
+  const lightboxImg = document.getElementById('lightboxImg');
+  function closeLightbox() {
+    lightbox.hidden = true;
+    lightboxImg.src = '';
+  }
+  document.querySelectorAll('.thumb').forEach(img => {
+    img.addEventListener('click', () => {
+      lightboxImg.src = img.dataset.full;
+      lightbox.hidden = false;
+    });
+  });
+  lightbox.addEventListener('click', closeLightbox);
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && !lightbox.hidden) closeLightbox();
+  });
 </script>
 {% endblock %}
