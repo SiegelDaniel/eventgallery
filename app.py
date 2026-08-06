@@ -30,15 +30,43 @@ os.makedirs(THUMB_DIR, exist_ok=True)
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = MAX_CONTENT_MB * 1024 * 1024
-# Set SECRET_KEY in the environment so gallery logins survive restarts.
-app.secret_key = os.environ.get("SECRET_KEY", os.urandom(24))
+
+
+def _load_secret_key():
+    """A stable key shared across gunicorn workers and restarts.
+
+    Prefer $SECRET_KEY; otherwise persist a generated key to disk so every
+    worker signs sessions with the same value (random per-worker keys would
+    make logins appear to drop at random)."""
+    env = os.environ.get("SECRET_KEY")
+    if env:
+        return env
+    key_path = os.path.join(UPLOAD_DIR, ".secret_key")
+    try:
+        with open(key_path, "rb") as fh:
+            return fh.read()
+    except FileNotFoundError:
+        key = os.urandom(32)
+        with open(key_path, "wb") as fh:
+            fh.write(key)
+        try:
+            os.chmod(key_path, 0o600)
+        except OSError:
+            pass
+        return key
+
+
+app.secret_key = _load_secret_key()
 
 
 def login_required(view):
     @wraps(view)
     def wrapped(*args, **kwargs):
         if not session.get("authed"):
-            return redirect(url_for("login", next=request.full_path))
+            # Only GET targets can be resumed via a redirect after login;
+            # POST endpoints (delete/download) would 405, so fall back to gallery.
+            nxt = request.path if request.method == "GET" else url_for("gallery")
+            return redirect(url_for("login", next=nxt))
         return view(*args, **kwargs)
 
     return wrapped
@@ -124,7 +152,10 @@ def login():
     if request.method == "POST":
         if request.form.get("password") == GALLERY_PASSWORD:
             session["authed"] = True
-            target = request.args.get("next") or url_for("gallery")
+            # Only allow safe relative redirects (no open-redirect off-site).
+            target = request.args.get("next") or ""
+            if not target.startswith("/") or target.startswith("//"):
+                target = url_for("gallery")
             return redirect(target)
         error = "Wrong password."
     return render_template("login.html", error=error)
