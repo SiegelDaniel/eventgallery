@@ -178,6 +178,7 @@ figure.tile { margin: 0; }
 .input:focus { outline: none; border-color: var(--accent); }
 
 /* Full-screen photo viewer */
+.lightbox[hidden] { display: none; }
 .lightbox {
   position: fixed;
   inset: 0;
