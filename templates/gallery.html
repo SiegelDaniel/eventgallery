@@ -21,10 +21,17 @@
       <div class="grid">
         {% for name in images %}
         <figure class="tile">
+          {% if is_video(name) %}
+          <video class="thumb" preload="metadata" muted playsinline
+                 src="{{ url_for('image', name=name) }}#t=0.1"
+                 data-full="{{ url_for('image', name=name) }}" data-video="1"></video>
+          <span class="play-badge">▶</span>
+          {% else %}
           <img class="thumb" loading="lazy"
                src="{{ url_for('thumb', name=name) }}"
                data-full="{{ url_for('image', name=name) }}"
                alt="{{ name }}">
+          {% endif %}
           <label class="pick" title="Select">
             <input type="checkbox" name="selected" value="{{ name }}">
             <span class="check"></span>
@@ -39,7 +46,7 @@
 <!-- Full-screen viewer -->
 <div id="lightbox" class="lightbox" hidden>
   <button type="button" class="lb-close" aria-label="Close">✕</button>
-  <img id="lightboxImg" src="" alt="">
+  <div id="lightboxContent" class="lb-content"></div>
 </div>
 
 <script>
@@ -54,20 +61,28 @@
     });
   }
 
-  // Click a photo to view it full size
+  // Click a photo/video to view it full size
   const lightbox = document.getElementById('lightbox');
-  const lightboxImg = document.getElementById('lightboxImg');
+  const lightboxContent = document.getElementById('lightboxContent');
   function closeLightbox() {
     lightbox.hidden = true;
-    lightboxImg.src = '';
+    lightboxContent.innerHTML = '';   // stops any playing video
   }
-  document.querySelectorAll('.thumb').forEach(img => {
-    img.addEventListener('click', () => {
-      lightboxImg.src = img.dataset.full;
+  document.querySelectorAll('.thumb').forEach(el => {
+    el.addEventListener('click', () => {
+      if (el.dataset.video) {
+        lightboxContent.innerHTML =
+          `<video src="${el.dataset.full}" controls autoplay playsinline></video>`;
+      } else {
+        lightboxContent.innerHTML = `<img src="${el.dataset.full}" alt="">`;
+      }
       lightbox.hidden = false;
     });
   });
-  lightbox.addEventListener('click', closeLightbox);
+  // Close when clicking the backdrop or ✕, but not when using the media/controls.
+  lightbox.addEventListener('click', e => {
+    if (e.target === lightbox || e.target.classList.contains('lb-close')) closeLightbox();
+  });
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape' && !lightbox.hidden) closeLightbox();
   });

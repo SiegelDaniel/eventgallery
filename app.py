@@ -1,5 +1,6 @@
 import io
 import os
+import shutil
 import time
 import zipfile
 from functools import wraps
@@ -21,9 +22,14 @@ from werkzeug.utils import secure_filename
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 UPLOAD_DIR = os.environ.get("UPLOAD_DIR", os.path.join(BASE_DIR, "uploads"))
 THUMB_DIR = os.path.join(UPLOAD_DIR, ".thumbs")
-ALLOWED_EXT = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".heic", ".heif"}
-MAX_CONTENT_MB = int(os.environ.get("MAX_CONTENT_MB", "50"))
+ALLOWED_IMAGE_EXT = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".heic", ".heif"}
+ALLOWED_VIDEO_EXT = {".mp4", ".mov", ".m4v", ".webm", ".3gp", ".avi", ".mkv"}
+ALLOWED_EXT = ALLOWED_IMAGE_EXT | ALLOWED_VIDEO_EXT
+# Videos are large — allow a big body by default. nginx client_max_body_size must match.
+MAX_CONTENT_MB = int(os.environ.get("MAX_CONTENT_MB", "512"))
 GALLERY_PASSWORD = os.environ.get("GALLERY_PASSWORD", "romanraucht")
+# Optional cap for the storage bar; falls back to the real filesystem free space.
+STORAGE_QUOTA_MB = os.environ.get("STORAGE_QUOTA_MB")
 
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 os.makedirs(THUMB_DIR, exist_ok=True)
@@ -89,6 +95,56 @@ def _allowed(filename):
     return os.path.splitext(filename)[1].lower() in ALLOWED_EXT
 
 
+def _is_video(filename):
+    return os.path.splitext(filename)[1].lower() in ALLOWED_VIDEO_EXT
+
+
+# Expose the video check to templates so the gallery can pick <img> vs <video>.
+app.jinja_env.globals["is_video"] = _is_video
+
+
+def _human_bytes(n):
+    for unit in ("B", "KB", "MB", "GB", "TB"):
+        if n < 1024 or unit == "TB":
+            return f"{n:.0f} {unit}" if unit == "B" else f"{n:.1f} {unit}"
+        n /= 1024
+
+
+def _dir_size(path):
+    total = 0
+    for root, _dirs, files in os.walk(path):
+        for f in files:
+            try:
+                total += os.path.getsize(os.path.join(root, f))
+            except OSError:
+                pass
+    return total
+
+
+def _storage_stats():
+    """Bytes used/free/total for the upload area, plus human-readable strings.
+
+    Uses STORAGE_QUOTA_MB as the cap if set, otherwise the real filesystem."""
+    used_uploads = _dir_size(UPLOAD_DIR)
+    if STORAGE_QUOTA_MB:
+        total = int(STORAGE_QUOTA_MB) * 1024 * 1024
+        used = used_uploads
+        free = max(total - used, 0)
+    else:
+        du = shutil.disk_usage(UPLOAD_DIR)
+        total, used, free = du.total, du.used, du.free
+    percent = round(used / total * 100, 1) if total else 0
+    return {
+        "used": used,
+        "free": free,
+        "total": total,
+        "percent": percent,
+        "used_h": _human_bytes(used),
+        "free_h": _human_bytes(free),
+        "total_h": _human_bytes(total),
+    }
+
+
 def _safe_name(name):
     """Return a stored filename that is safe and unique."""
     base = secure_filename(name) or "image"
@@ -102,7 +158,7 @@ def _safe_name(name):
     return candidate
 
 
-def _list_images():
+def _list_media():
     files = []
     for name in os.listdir(UPLOAD_DIR):
         path = os.path.join(UPLOAD_DIR, name)
@@ -126,7 +182,12 @@ def _valid_selection(names):
 
 @app.route("/")
 def index():
-    return render_template("upload.html")
+    return render_template("upload.html", storage=_storage_stats())
+
+
+@app.route("/storage")
+def storage():
+    return jsonify(_storage_stats())
 
 
 @app.route("/upload", methods=["POST"])
@@ -170,7 +231,7 @@ def logout():
 @app.route("/gallery")
 @login_required
 def gallery():
-    return render_template("gallery.html", images=_list_images())
+    return render_template("gallery.html", images=_list_media())
 
 
 @app.route("/image/<path:name>")
@@ -191,6 +252,9 @@ def thumb(name):
     src = os.path.join(UPLOAD_DIR, name)
     if not os.path.isfile(src):
         abort(404)
+    # No image thumbnail for videos — the gallery renders those with <video>.
+    if _is_video(name):
+        return send_from_directory(UPLOAD_DIR, name)
     thumb_path = os.path.join(THUMB_DIR, name + ".jpg")
     if not os.path.exists(thumb_path) or os.path.getmtime(thumb_path) < os.path.getmtime(src):
         try:

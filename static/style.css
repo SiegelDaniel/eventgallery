@@ -189,7 +189,44 @@ figure.tile { margin: 0; }
   z-index: 100;
   cursor: zoom-out;
 }
-.lightbox img { max-width: 96vw; max-height: 92vh; object-fit: contain; border-radius: 6px; }
+.lb-content { display: flex; align-items: center; justify-content: center; }
+.lightbox img,
+.lightbox video { max-width: 96vw; max-height: 92vh; object-fit: contain; border-radius: 6px; }
+.lightbox video { cursor: default; }
+
+/* Storage gauge on the upload page */
+.storage { margin: 6px 0 18px; text-align: left; }
+.storage-bar {
+  height: 8px;
+  border-radius: 6px;
+  background: #0f131b;
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+.storage-bar span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transition: width .3s ease;
+}
+.storage-text { margin: 6px 0 0; font-size: .85rem; }
+
+/* Video tiles in the gallery */
+.tile .play-badge {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 44px; height: 44px;
+  border-radius: 50%;
+  background: rgba(0,0,0,.5);
+  color: #fff;
+  font-size: 1.1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+figure.tile video.thumb { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; cursor: zoom-in; background: #000; }
 .lb-close {
   position: absolute;
   top: 14px; right: 16px;

@@ -2,13 +2,20 @@
 {% block title %}Upload · Event Gallery{% endblock %}
 {% block content %}
 <section class="card">
-  <h1>Add your photos</h1>
-  <p class="muted">Pick pictures from your library or take a new one.</p>
+  <h1>Add your photos &amp; videos</h1>
+  <p class="muted">Pick from your library or take a new one.</p>
+
+  <div class="storage" id="storage">
+    <div class="storage-bar"><span id="storageFill" style="width: {{ storage.percent }}%"></span></div>
+    <p class="storage-text muted" id="storageText">
+      {{ storage.used_h }} used · {{ storage.free_h }} free of {{ storage.total_h }}
+    </p>
+  </div>
 
   <form action="{{ url_for('upload') }}" method="post" enctype="multipart/form-data" id="uploadForm">
     <label class="picker" for="photos">
-      <span id="pickerText">Tap to add photos</span>
-      <input id="photos" type="file" name="photos" accept="image/*" multiple hidden>
+      <span id="pickerText">Tap to add photos or videos</span>
+      <input id="photos" type="file" name="photos" accept="image/*,video/*" multiple hidden>
     </label>
 
     <div id="preview" class="preview"></div>
@@ -25,20 +32,38 @@
   const pickerText = document.getElementById('pickerText');
   const submitBtn = document.getElementById('submitBtn');
   const status = document.getElementById('status');
+  const storageFill = document.getElementById('storageFill');
+  const storageText = document.getElementById('storageText');
+
+  async function refreshStorage() {
+    try {
+      const s = await (await fetch('{{ url_for("storage") }}')).json();
+      storageFill.style.width = s.percent + '%';
+      storageText.textContent = `${s.used_h} used · ${s.free_h} free of ${s.total_h}`;
+    } catch (e) { /* leave the server-rendered values */ }
+  }
 
   input.addEventListener('change', () => {
     preview.innerHTML = '';
     status.textContent = '';
     const files = Array.from(input.files || []);
     pickerText.textContent = files.length
-      ? `${files.length} photo${files.length > 1 ? 's' : ''} selected — tap to change`
-      : 'Tap to add photos';
+      ? `${files.length} item${files.length > 1 ? 's' : ''} selected — tap to change`
+      : 'Tap to add photos or videos';
     submitBtn.disabled = files.length === 0;
     files.forEach(file => {
-      const img = document.createElement('img');
-      img.src = URL.createObjectURL(file);
-      img.onload = () => URL.revokeObjectURL(img.src);
-      preview.appendChild(img);
+      const url = URL.createObjectURL(file);
+      if (file.type.startsWith('video/')) {
+        const v = document.createElement('video');
+        v.src = url; v.muted = true; v.playsInline = true;
+        v.onloadeddata = () => URL.revokeObjectURL(url);
+        preview.appendChild(v);
+      } else {
+        const img = document.createElement('img');
+        img.src = url;
+        img.onload = () => URL.revokeObjectURL(url);
+        preview.appendChild(img);
+      }
     });
   });
 
@@ -55,12 +80,12 @@
       });
       if (!res.ok) throw new Error('upload failed');
       const data = await res.json();
-      // Stay on this page — just confirm and reset for the next batch.
       form.reset();
       preview.innerHTML = '';
-      pickerText.textContent = 'Tap to add photos';
+      pickerText.textContent = 'Tap to add photos or videos';
       status.className = 'status ok';
-      status.textContent = `✓ Uploaded ${data.saved} photo${data.saved === 1 ? '' : 's'}. Add more?`;
+      status.textContent = `✓ Uploaded ${data.saved} item${data.saved === 1 ? '' : 's'}. Add more?`;
+      refreshStorage();
     } catch (err) {
       status.className = 'status err';
       status.textContent = 'Upload failed. Please try again.';
